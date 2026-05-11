@@ -15,8 +15,8 @@ export default function StudyPlanPage() {
             📅 Plano de Estudo
           </h1>
           <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-            Informe o tema, tempo disponível e nível, e a IA criará um plano
-            personalizado.
+            Informe tema, prazo e contexto de concurso (edital, banca e observações) para gerar
+            um plano personalizado.
           </p>
         </div>
         <StudyPlanClient />

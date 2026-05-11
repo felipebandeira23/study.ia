@@ -27,7 +27,9 @@ export default async function PlanDetailPage({ params }: PlanDetailPageProps) {
 
   const { data: plan } = await supabase
     .from("study_plans")
-    .select("id, topic, level, duration_days, plan_content, created_at")
+    .select(
+      "id, topic, level, duration_days, plan_content, created_at, contest_name, contest_organizer, contest_exam_date, contest_notes"
+    )
     .eq("id", planId)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -67,7 +69,44 @@ export default async function PlanDetailPage({ params }: PlanDetailPageProps) {
           >
             Voltar para lista
           </Link>
+          <Link
+            href={`/study/plans/${plan.id}/edit`}
+            className="rounded-full border border-blue-300 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/20"
+          >
+            Editar e regenerar
+          </Link>
         </div>
+
+        {(plan.contest_name || plan.contest_organizer || plan.contest_exam_date || plan.contest_notes) && (
+          <section className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+              Contexto de concurso
+            </h2>
+            <ul className="mt-3 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
+              {plan.contest_name && (
+                <li>
+                  <strong>Concurso:</strong> {plan.contest_name}
+                </li>
+              )}
+              {plan.contest_organizer && (
+                <li>
+                  <strong>Banca:</strong> {plan.contest_organizer}
+                </li>
+              )}
+              {plan.contest_exam_date && (
+                <li>
+                  <strong>Prova:</strong>{" "}
+                  {new Date(plan.contest_exam_date).toLocaleDateString("pt-BR")}
+                </li>
+              )}
+              {plan.contest_notes && (
+                <li>
+                  <strong>Observações:</strong> {plan.contest_notes}
+                </li>
+              )}
+            </ul>
+          </section>
+        )}
 
         <section className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Plano de estudo</h2>

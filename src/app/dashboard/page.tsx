@@ -2,6 +2,8 @@ import { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
+import { getContestNewsFeed } from "@/lib/contests/news-feed";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,70 @@ type RecentActivity = {
   created_at: string;
   href: string;
 };
+
+type TrackedContest = {
+  id: string;
+  name: string;
+  organizer: string | null;
+  exam_date: string | null;
+  notes: string | null;
+  created_at: string;
+};
+
+async function addTrackedContestAction(formData: FormData) {
+  "use server";
+
+  const name = formData.get("name");
+  const organizer = formData.get("organizer");
+  const examDate = formData.get("examDate");
+  const notes = formData.get("notes");
+
+  if (!name || typeof name !== "string" || name.trim().length === 0) {
+    return;
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/auth/login");
+  }
+
+  await supabase.from("tracked_contests").insert({
+    user_id: user.id,
+    name: name.trim().slice(0, 140),
+    organizer: typeof organizer === "string" && organizer.trim() ? organizer.trim().slice(0, 120) : null,
+    exam_date:
+      typeof examDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(examDate) ? examDate : null,
+    notes: typeof notes === "string" && notes.trim() ? notes.trim().slice(0, 2000) : null,
+  });
+
+  revalidatePath("/dashboard");
+}
+
+async function removeTrackedContestAction(formData: FormData) {
+  "use server";
+
+  const contestId = formData.get("contestId");
+  if (!contestId || typeof contestId !== "string") {
+    return;
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/auth/login");
+  }
+
+  await supabase.from("tracked_contests").delete().eq("id", contestId).eq("user_id", user.id);
+
+  revalidatePath("/dashboard");
+}
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -39,6 +105,7 @@ export default async function DashboardPage() {
     notesRecentResult,
     decksRecentResult,
     plansRecentResult,
+    trackedContestsResult,
   ] = await Promise.all([
     supabase.from("study_notes").select("id", { count: "exact", head: true }),
     supabase.from("decks").select("id", { count: "exact", head: true }),
@@ -59,12 +126,35 @@ export default async function DashboardPage() {
       .select("id, topic, created_at")
       .order("created_at", { ascending: false })
       .limit(5),
+    supabase
+      .from("tracked_contests")
+      .select("id, name, organizer, exam_date, notes, created_at")
+      .order("created_at", { ascending: false })
+      .limit(8),
   ]);
 
   const notesCount = notesCountResult.count ?? 0;
   const decksCount = decksCountResult.count ?? 0;
   const flashcardsCount = flashcardsCountResult.count ?? 0;
   const plansCount = plansCountResult.count ?? 0;
+  const trackedContests = (trackedContestsResult.data ?? []) as TrackedContest[];
+  let contestFeed: Awaited<ReturnType<typeof getContestNewsFeed>> = [];
+
+  if (trackedContests.length > 0) {
+    try {
+      contestFeed = await getContestNewsFeed(
+        trackedContests.map((contest) => ({
+          name: contest.name,
+          organizer: contest.organizer,
+          examDate: contest.exam_date,
+          notes: contest.notes,
+        })),
+        6
+      );
+    } catch (error) {
+      console.error("Error generating contest news feed:", error);
+    }
+  }
 
   const recentActivity: RecentActivity[] = [
     ...(notesRecentResult.data ?? []).map((note) => ({
@@ -97,6 +187,7 @@ export default async function DashboardPage() {
     { label: "Decks criados", value: decksCount, icon: "🗂️" },
     { label: "Flashcards totais", value: flashcardsCount, icon: "🧠" },
     { label: "Planos de estudo", value: plansCount, icon: "📅" },
+    { label: "Concursos rastreados", value: trackedContests.length, icon: "📌" },
   ];
 
   return (
@@ -177,7 +268,7 @@ export default async function DashboardPage() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {stats.map((stat) => (
               <div
                 key={stat.label}
@@ -215,6 +306,139 @@ export default async function DashboardPage() {
                 Ver planos salvos
               </Link>
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <section className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                  📌 Concursos rastreados
+                </h2>
+                <Link
+                  href="/study/plan"
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  Gerar plano →
+                </Link>
+              </div>
+
+              <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                Pesquise/informe um concurso para acompanhar notícias e usar contexto no plano.
+              </p>
+
+              <form action={addTrackedContestAction} className="mt-4 space-y-3">
+                <input
+                  type="text"
+                  name="name"
+                  required
+                  maxLength={140}
+                  placeholder="Ex: INSS 2026, TRT 2ª Região, Polícia Federal"
+                  className="block w-full rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                />
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <input
+                    type="text"
+                    name="organizer"
+                    maxLength={120}
+                    placeholder="Banca/organizador (opcional)"
+                    className="block w-full rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                  />
+                  <input
+                    type="date"
+                    name="examDate"
+                    className="block w-full rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                  />
+                </div>
+                <textarea
+                  name="notes"
+                  rows={2}
+                  maxLength={2000}
+                  placeholder="Observações rápidas (disciplinas, edital, prioridades)."
+                  className="block w-full rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                />
+                <button
+                  type="submit"
+                  className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                >
+                  Rastrear concurso
+                </button>
+              </form>
+
+              {trackedContests.length === 0 ? (
+                <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
+                  Nenhum concurso rastreado ainda.
+                </p>
+              ) : (
+                <ul className="mt-4 space-y-3">
+                  {trackedContests.map((contest) => (
+                    <li
+                      key={contest.id}
+                      className="flex items-start justify-between gap-3 rounded-xl border border-zinc-200 p-3 dark:border-zinc-800"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                          {contest.name}
+                        </p>
+                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          {contest.organizer ? `${contest.organizer} • ` : ""}
+                          {contest.exam_date
+                            ? `Prova: ${new Date(contest.exam_date).toLocaleDateString("pt-BR")}`
+                            : "Data da prova não informada"}
+                        </p>
+                      </div>
+                      <form action={removeTrackedContestAction}>
+                        <input type="hidden" name="contestId" value={contest.id} />
+                        <button
+                          type="submit"
+                          className="rounded-full border border-red-300 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+                        >
+                          Remover
+                        </button>
+                      </form>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                📰 Feed de concursos (curadoria IA)
+              </h2>
+              <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                Conteúdo assistido por IA a partir dos concursos rastreados e contexto informado por
+                você. Sempre confirme em editais e fontes oficiais.
+              </p>
+
+              {contestFeed.length === 0 ? (
+                <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
+                  Adicione concursos para gerar um feed contextualizado.
+                </p>
+              ) : (
+                <ul className="mt-4 space-y-3">
+                  {contestFeed.map((item, index) => (
+                    <li
+                      key={`${item.title}-${index}`}
+                      className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800"
+                    >
+                      <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                        {item.title}
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        {item.contestName || "Concurso geral"}
+                      </p>
+                      <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">{item.summary}</p>
+                      <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                        Relevância: {item.relevance}
+                      </p>
+                      <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-300">
+                        {item.sourceLabel}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           </div>
 
           <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6">

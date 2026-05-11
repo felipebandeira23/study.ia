@@ -1,4 +1,9 @@
-import { generateFlashcards, DEFAULT_MODEL } from "@/lib/ai/gemini";
+import {
+  generateContestNewsFeed,
+  generateFlashcards,
+  generateStudyPlan,
+  DEFAULT_MODEL,
+} from "@/lib/ai/gemini";
 
 // Stable mock for `generateContent` shared across all tests.
 const mockGenerateContent = jest.fn();
@@ -57,5 +62,48 @@ describe("generateFlashcards", () => {
     await expect(generateFlashcards("any topic", 1)).rejects.toThrow(
       "Empty response from AI model"
     );
+  });
+});
+
+describe("generateStudyPlan", () => {
+  it("includes contest context when provided", async () => {
+    mockGenerateContent.mockResolvedValueOnce({ text: "plano gerado" });
+
+    const result = await generateStudyPlan("Direito Administrativo", 60, "intermediário", {
+      contestName: "TRT",
+      organizer: "FCC",
+      examDate: "2026-08-10",
+      editalText: "Direito Constitucional e Administrativo",
+      notes: "2h por dia",
+      previousExamsNotes: "Questões sobre atos administrativos",
+    });
+
+    expect(result).toBe("plano gerado");
+    const payload = mockGenerateContent.mock.calls[0][0];
+    expect(payload.contents).toContain("Concurso: TRT");
+    expect(payload.contents).toContain("Data da prova: 2026-08-10");
+    expect(payload.contents).toContain("provas anteriores");
+  });
+});
+
+describe("generateContestNewsFeed", () => {
+  it("parses feed items from model JSON", async () => {
+    mockGenerateContent.mockResolvedValueOnce({
+      text: JSON.stringify([
+        {
+          title: "Possível foco em legislação",
+          summary: "Revisar legislação seca nas próximas semanas.",
+          relevance: "Tema recorrente em concursos similares.",
+          contestName: "INSS",
+          sourceType: "ai_curated",
+          sourceLabel: "qualquer texto",
+        },
+      ]),
+    });
+
+    const feed = await generateContestNewsFeed([{ name: "INSS" }], 4);
+    expect(feed).toHaveLength(1);
+    expect(feed[0].sourceType).toBe("ai_curated");
+    expect(feed[0].sourceLabel).toContain("Confirme em fontes oficiais");
   });
 });

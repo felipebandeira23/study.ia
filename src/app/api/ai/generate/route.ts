@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { generateStudyPlan } from "@/lib/ai/gemini";
+import { generateStudyPlan, StudyPlanContext } from "@/lib/ai/gemini";
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,10 +14,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { topic, durationDays, level } = body as {
+    const { topic, durationDays, level, contestContext } = body as {
       topic?: string;
       durationDays?: number;
       level?: "iniciante" | "intermediário" | "avançado";
+      contestContext?: StudyPlanContext;
     };
 
     if (!topic || typeof topic !== "string" || topic.trim().length === 0) {
@@ -29,6 +30,11 @@ export async function POST(request: NextRequest) {
 
     const days = Math.min(Math.max(durationDays ?? 30, 1), 365);
     const studyLevel = level ?? "iniciante";
+    const context = contestContext ?? {};
+    const examDate =
+      context.examDate && /^\d{4}-\d{2}-\d{2}$/.test(context.examDate)
+        ? context.examDate
+        : null;
 
     const validLevels = ["iniciante", "intermediário", "avançado"];
     if (!validLevels.includes(studyLevel)) {
@@ -38,7 +44,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const plan = await generateStudyPlan(topic, days, studyLevel);
+    const plan = await generateStudyPlan(topic, days, studyLevel, context);
 
     const { data: studyPlan, error: insertError } = await supabase
       .from("study_plans")
@@ -48,6 +54,12 @@ export async function POST(request: NextRequest) {
         duration_days: days,
         level: studyLevel,
         plan_content: plan,
+        contest_name: context.contestName?.trim() || null,
+        contest_organizer: context.organizer?.trim() || null,
+        contest_exam_date: examDate,
+        contest_edital_text: context.editalText?.trim() || null,
+        contest_notes: context.notes?.trim() || null,
+        previous_exams_notes: context.previousExamsNotes?.trim() || null,
       })
       .select("id, topic")
       .single();

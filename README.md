@@ -13,6 +13,7 @@ O **StudyAI** é uma aplicação web que auxilia estudantes a aprender mais rapi
 - **Resumos de estudo** — organizados, com títulos e marcadores, prontos para revisão.
 - **Flashcards** — baralhos de perguntas e respostas gerados a partir do conteúdo colado.
 - **Planos de estudo** — cronogramas personalizados por tema, duração e nível de conhecimento.
+- **Módulo de concursos (MVP)** — rastreamento de concursos, feed assistido por IA e planos contextualizados por edital/prazo.
 
 O produto é pensado como um MVP focado em velocidade de entrega e experiência simples, com escalabilidade para features futuras (quizzes, progresso, colaboração, etc.).
 
@@ -77,6 +78,9 @@ supabase/migrations/001_initial_schema.sql
 
 -- Execute depois:
 supabase/migrations/002_rls_policies.sql
+
+-- Execute por último:
+supabase/migrations/003_contests_module.sql
 ```
 
 > **Dica:** Você pode copiar o conteúdo de cada arquivo e colar diretamente no SQL Editor do Supabase.
@@ -262,6 +266,7 @@ Execute os arquivos SQL no **SQL Editor** do Supabase, nesta ordem:
 ```
 1. supabase/migrations/001_initial_schema.sql  ← tabelas, índices, triggers
 2. supabase/migrations/002_rls_policies.sql    ← Row Level Security
+3. supabase/migrations/003_contests_module.sql ← concursos rastreados + contexto de plano
 ```
 
 ### Chaves de API
