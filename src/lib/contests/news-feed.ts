@@ -40,6 +40,9 @@ const RSS_SOURCES: RssSource[] = [
 ];
 
 const FETCH_TIMEOUT_MS = 8000;
+const RSS_REVALIDATE_SECONDS = 900; // 15 minutes balances recency and external source load.
+const RELATED_CONTEST_SCORE = 10;
+const PUBLISHED_AT_SCORE_DIVISOR = 1e11;
 
 function normalize(text: string): string {
   return text
@@ -113,7 +116,7 @@ async function fetchRssSource(source: RssSource): Promise<RawRssItem[]> {
       headers: {
         Accept: "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
       },
-      next: { revalidate: 900 },
+      next: { revalidate: RSS_REVALIDATE_SECONDS },
     });
 
     if (!response.ok) {
@@ -180,7 +183,9 @@ export async function getContestNewsFeed(
 
   const withContext = filteredBySearch.map((item) => {
     const relatedContest = getRelatedContestName(item, contests);
-    const score = (relatedContest ? 10 : 0) + (item.publishedAt ? Date.parse(item.publishedAt) / 1e11 : 0);
+    const score =
+      (relatedContest ? RELATED_CONTEST_SCORE : 0) +
+      (item.publishedAt ? Date.parse(item.publishedAt) / PUBLISHED_AT_SCORE_DIVISOR : 0);
 
     return {
       item,

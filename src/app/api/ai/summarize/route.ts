@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { PDFParse } from "pdf-parse";
 import { createClient } from "@/lib/supabase/server";
 import { generateStudySummary } from "@/lib/ai/gemini";
 import { buildNoteTitle, buildPdfNoteTitle } from "@/lib/utils";
@@ -25,11 +26,6 @@ type SummaryInput = {
   title: string;
 };
 
-type PdfParser = {
-  getText: () => Promise<{ text: string }>;
-  destroy: () => Promise<void>;
-};
-
 function normalizeManualContent(content: unknown): string {
   if (typeof content !== "string") {
     return "";
@@ -47,7 +43,7 @@ function validateContentLength(content: string) {
 }
 
 export async function extractPdfText(file: File): Promise<string> {
-  let parser: PdfParser | null = null;
+  let parser: InstanceType<typeof PDFParse> | null = null;
   try {
     const { PDFParse } = await import("pdf-parse");
     const buffer = Buffer.from(await file.arrayBuffer());
