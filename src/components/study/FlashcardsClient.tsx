@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Flashcard } from "@/types";
 
@@ -112,9 +113,17 @@ export default function FlashcardsClient() {
             🗂️ {flashcards.length} flashcards gerados — clique para virar
           </h2>
           {deck && (
-            <p className="text-xs text-emerald-700 dark:text-emerald-400">
-              ✅ Deck salvo no histórico: {deck.title}
-            </p>
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <p className="text-emerald-700 dark:text-emerald-400">
+                ✅ Deck salvo no histórico: {deck.title}
+              </p>
+              <Link
+                href={`/study/review/${deck.id}`}
+                className="font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+              >
+                Revisar agora →
+              </Link>
+            </div>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {flashcards.map((card, i) => (
