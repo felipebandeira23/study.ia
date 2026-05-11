@@ -41,7 +41,7 @@ export default function SummarizeClient() {
 
       const res = await fetch("/api/ai/summarize", requestInit);
 
-      let data: { error?: string; summary?: string; note?: { id: string; title: string } } = {};
+      let data: { error?: string; summary?: string; note?: { id: string; title: string }; saved?: boolean } = {};
       try {
         data = (await res.json()) as typeof data;
       } catch {
@@ -59,7 +59,7 @@ export default function SummarizeClient() {
       }
 
       setSummary(data.summary);
-      setSavedNote(data.note ?? null);
+      setSavedNote(data.saved !== false ? (data.note ?? null) : null);
     } catch {
       setError("Erro de rede. Tente novamente.");
     } finally {
