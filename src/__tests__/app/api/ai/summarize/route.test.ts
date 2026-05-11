@@ -31,15 +31,19 @@ jest.mock("@/lib/supabase/server", () => ({
   ),
 }));
 
-const mockPdfGetText = jest.fn();
-const mockPdfDestroy = jest.fn();
+// Mock pdfjs-dist legacy build (used by extractPdfText).
+// Variables named mock* can be referenced inside jest.mock factories (babel-jest hoisting).
+const mockPdfGetTextContent = jest.fn();
+const mockPdfPageCleanup = jest.fn();
+const mockPdfDocDestroy = jest.fn();
+const mockPdfGetPage = jest.fn();
+const mockPdfGetDocument = jest.fn();
 
-jest.mock("pdf-parse", () => ({
-  PDFParse: jest.fn().mockImplementation(() => ({
-    getText: mockPdfGetText,
-    destroy: mockPdfDestroy,
-  })),
+jest.mock("pdfjs-dist/legacy/build/pdf.mjs", () => ({
+  GlobalWorkerOptions: { workerSrc: "" },
+  getDocument: mockPdfGetDocument,
 }));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -87,9 +91,23 @@ beforeEach(() => {
     error: null,
   });
 
-  // PDF extraction succeeds by default
-  mockPdfGetText.mockResolvedValue({ text: "Texto extraído do PDF" });
-  mockPdfDestroy.mockResolvedValue(undefined);
+  // Default PDF extraction: 1-page doc with text content
+  mockPdfGetTextContent.mockResolvedValue({
+    items: [{ str: "Texto extraído do PDF" }],
+  });
+  mockPdfPageCleanup.mockReturnValue(undefined);
+  mockPdfDocDestroy.mockResolvedValue(undefined);
+  mockPdfGetPage.mockResolvedValue({
+    getTextContent: mockPdfGetTextContent,
+    cleanup: mockPdfPageCleanup,
+  });
+  mockPdfGetDocument.mockReturnValue({
+    promise: Promise.resolve({
+      numPages: 1,
+      getPage: mockPdfGetPage,
+      destroy: mockPdfDocDestroy,
+    }),
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -202,7 +220,7 @@ describe("POST /api/ai/summarize — PDF upload", () => {
   });
 
   it("returns 400 when extracted PDF text is empty", async () => {
-    mockPdfGetText.mockResolvedValue({ text: "" });
+    mockPdfGetTextContent.mockResolvedValue({ items: [] });
 
     const file = makePdfFile("data");
     const req = makeFormRequest({ file });
@@ -215,7 +233,9 @@ describe("POST /api/ai/summarize — PDF upload", () => {
   });
 
   it("returns 422 when PDF parser throws an error", async () => {
-    mockPdfGetText.mockRejectedValue(new Error("PDF parse failure"));
+    mockPdfGetDocument.mockImplementation(() => ({
+      promise: Promise.reject(new Error("PDF parse failure")),
+    }));
 
     const file = makePdfFile("corrupt");
     const req = makeFormRequest({ file });
@@ -282,22 +302,42 @@ describe("POST /api/ai/summarize — persistence failure", () => {
 // ---------------------------------------------------------------------------
 
 describe("extractPdfText", () => {
-  it("returns trimmed text from a PDF file", async () => {
-    mockPdfGetText.mockResolvedValue({ text: "  Conteúdo do PDF  " });
+  it("returns trimmed concatenated text from all PDF pages", async () => {
+    mockPdfGetTextContent.mockResolvedValue({
+      items: [{ str: "  Conteúdo do PDF  " }],
+    });
 
     const file = makePdfFile("data");
     const result = await extractPdfText(file);
 
     expect(result).toBe("Conteúdo do PDF");
-    expect(mockPdfDestroy).toHaveBeenCalled();
+    expect(mockPdfDocDestroy).toHaveBeenCalled();
   });
 
-  it("calls destroy even when getText throws", async () => {
-    mockPdfGetText.mockRejectedValue(new Error("parse error"));
+  it("joins text from multiple pages", async () => {
+    mockPdfGetDocument.mockReturnValue({
+      promise: Promise.resolve({
+        numPages: 2,
+        getPage: mockPdfGetPage,
+        destroy: mockPdfDocDestroy,
+      }),
+    });
+    mockPdfGetTextContent
+      .mockResolvedValueOnce({ items: [{ str: "Página 1" }] })
+      .mockResolvedValueOnce({ items: [{ str: "Página 2" }] });
+
+    const file = makePdfFile("data");
+    const result = await extractPdfText(file);
+
+    expect(result).toBe("Página 1\nPágina 2");
+  });
+
+  it("destroys the document even when getTextContent throws", async () => {
+    mockPdfGetTextContent.mockRejectedValue(new Error("parse error"));
 
     const file = makePdfFile("data");
     await expect(extractPdfText(file)).rejects.toThrow();
-    expect(mockPdfDestroy).toHaveBeenCalled();
+    expect(mockPdfDocDestroy).toHaveBeenCalled();
   });
 });
 
@@ -318,3 +358,4 @@ describe("parseSummaryInput — multipart text fallback", () => {
     await expect(parseSummaryInput(req)).rejects.toThrow(/texto|PDF/i);
   });
 });
+

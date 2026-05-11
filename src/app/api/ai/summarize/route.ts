@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { generateStudySummary } from "@/lib/ai/gemini";
 import { buildNoteTitle, buildPdfNoteTitle } from "@/lib/utils";
 
-// Force Node.js runtime so pdf-parse (pdfjs) works correctly on Vercel.
+// Force Node.js runtime so pdfjs-dist works correctly on Vercel.
 export const runtime = "nodejs";
 
 const MAX_CONTENT_CHARS = 50000;
@@ -42,15 +42,20 @@ function validateContentLength(content: string) {
 }
 
 export async function extractPdfText(file: File): Promise<string> {
-  // Dynamic import isolates pdf-parse (and its native deps) from the text-only
-  // code path. If the library fails to load in a given environment, only PDF
-  // requests are affected; text-only requests continue to work normally.
-  let PDFParse: (typeof import("pdf-parse"))["PDFParse"];
+  // Use pdfjs-dist directly (legacy build required for Node.js environments).
+  // This avoids the @napi-rs/canvas native dependency that pdf-parse v2 pulls
+  // in at import time and fails in Vercel Lambda on certain platforms.
+  type PdfJs = typeof import("pdfjs-dist");
+  let pdfjs: PdfJs;
   try {
-    ({ PDFParse } = await import("pdf-parse"));
+    // The legacy build ships its own types re-exporting pdfjs-dist; the cast
+    // is safe because the public API surface is identical.
+    pdfjs = (await import(
+      "pdfjs-dist/legacy/build/pdf.mjs"
+    )) as unknown as PdfJs;
   } catch (importErr) {
     console.error(
-      "[summarize] Failed to load pdf-parse module:",
+      "[summarize] Failed to load pdfjs-dist:",
       importErr instanceof Error ? importErr.message : importErr
     );
     throw new PdfExtractionError(
@@ -58,21 +63,58 @@ export async function extractPdfText(file: File): Promise<string> {
     );
   }
 
-  let parser: InstanceType<typeof PDFParse> | null = null;
+  // Resolve the worker file path using require.resolve so it works correctly
+  // in both local dev and Vercel's Lambda (where __dirname / CWD can differ).
   try {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    parser = new PDFParse({ data: buffer });
-    const result = await parser.getText();
-    return result.text.trim();
+    const { createRequire } = await import("module");
+    const { pathToFileURL } = await import("url");
+    const _require = createRequire(import.meta.url);
+    const workerPath = _require.resolve(
+      "pdfjs-dist/legacy/build/pdf.worker.mjs"
+    );
+    pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).href;
+  } catch (workerErr) {
+    console.warn(
+      "[summarize] PDF worker path resolution failed, pdfjs may fall back to inline mode:",
+      workerErr instanceof Error ? workerErr.message : workerErr
+    );
+  }
+
+  const buffer = await file.arrayBuffer();
+  const data = new Uint8Array(buffer);
+
+  let doc: import("pdfjs-dist").PDFDocumentProxy | null = null;
+  try {
+    doc = await pdfjs.getDocument({ data }).promise;
+    const numPages = doc.numPages;
+    const pageTexts: string[] = [];
+
+    for (let i = 1; i <= numPages; i++) {
+      const page = await doc.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item) => ("str" in item ? item.str : ""))
+        .join(" ");
+      pageTexts.push(pageText);
+      page.cleanup();
+    }
+
+    return pageTexts.join("\n").trim();
   } catch (err) {
-    console.error("[summarize] PDF extraction failed:", err instanceof Error ? err.message : err);
+    console.error(
+      "[summarize] PDF extraction failed:",
+      err instanceof Error ? err.message : err
+    );
     throw new PdfExtractionError(
       err instanceof Error ? err.message : "Falha ao processar o PDF"
     );
   } finally {
-    if (parser) {
-      await parser.destroy().catch((err: unknown) => {
-        console.warn("[summarize] Failed to destroy PDF parser:", err instanceof Error ? err.message : err);
+    if (doc) {
+      await doc.destroy().catch((err: unknown) => {
+        console.warn(
+          "[summarize] Failed to destroy PDF document:",
+          err instanceof Error ? err.message : err
+        );
       });
     }
   }
