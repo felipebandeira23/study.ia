@@ -1,5 +1,6 @@
 import {
   buildNoteTitle,
+  buildPdfNoteTitle,
   buildDeckTitle,
   clampCardCount,
   stripMarkdownCodeBlock,
@@ -62,6 +63,30 @@ describe("buildDeckTitle", () => {
   it("returns content at exactly 60 characters without truncation", () => {
     const content = "C".repeat(60);
     expect(buildDeckTitle(content)).toBe(`Deck: ${content}`);
+  });
+});
+
+describe("buildPdfNoteTitle", () => {
+  it("uses the PDF file name as title when available", () => {
+    expect(buildPdfNoteTitle("Direito Constitucional.pdf", "conteúdo")).toBe(
+      "Direito Constitucional"
+    );
+  });
+
+  it("normalizes spaces in file name", () => {
+    expect(buildPdfNoteTitle("  edital   receita  .pdf  ", "conteúdo")).toBe("edital receita");
+  });
+
+  it("falls back to content-derived title when file name is empty", () => {
+    expect(buildPdfNoteTitle("   ", "Introdução ao estudo de processos")).toBe(
+      "Introdução ao estudo de processos"
+    );
+  });
+
+  it("truncates long file names to 80 characters", () => {
+    const title = buildPdfNoteTitle(`${"A".repeat(90)}.pdf`, "conteúdo");
+    expect(title).toHaveLength(80);
+    expect(title.endsWith("...")).toBe(true);
   });
 });
 

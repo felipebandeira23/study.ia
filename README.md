@@ -10,7 +10,7 @@
 
 O **StudyAI** é uma aplicação web que auxilia estudantes a aprender mais rapidamente com o apoio de IA generativa (Google Gemini). O usuário faz login, cola ou descreve o conteúdo que deseja estudar, e a plataforma gera automaticamente:
 
-- **Resumos de estudo** — organizados, com títulos e marcadores, prontos para revisão.
+- **Resumos de estudo** — organizados, com títulos e marcadores, prontos para revisão, a partir de texto ou PDF.
 - **Flashcards** — baralhos de perguntas e respostas gerados a partir do conteúdo colado.
 - **Planos de estudo** — cronogramas personalizados por tema, duração e nível de conhecimento.
 - **Módulo de concursos (MVP)** — rastreamento de concursos, feed assistido por IA e planos contextualizados por edital/prazo.
@@ -331,7 +331,7 @@ O `.gitignore` já está configurado para **nunca commitar** arquivos de variáv
 
 - [ ] Quiz gerado por IA com pontuação
 - [ ] Sistema de repetição espaçada (Anki-like)
-- [ ] Upload de PDF/imagem para gerar conteúdo
+- [x] Upload de PDF para gerar resumo de estudo
 - [ ] Notificações de revisão programada
 - [ ] Compartilhamento de decks entre usuários
 
