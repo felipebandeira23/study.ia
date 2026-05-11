@@ -79,7 +79,7 @@ export default async function DashboardPage() {
       type: "Deck" as const,
       title: deck.title,
       created_at: deck.created_at,
-      href: "/study/flashcards",
+      href: `/study/review/${deck.id}`,
     })),
     ...(plansRecentResult.data ?? []).map((plan) => ({
       id: plan.id,
