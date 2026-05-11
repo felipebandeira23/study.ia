@@ -4,11 +4,21 @@ import { createClient } from "@/lib/supabase/server";
 import { generateStudySummary } from "@/lib/ai/gemini";
 import { buildNoteTitle, buildPdfNoteTitle } from "@/lib/utils";
 
+// Force Node.js runtime so pdf-parse (pdfjs) works correctly on Vercel.
+export const runtime = "nodejs";
+
 const MAX_CONTENT_CHARS = 50000;
 const MAX_PDF_SIZE_BYTES = 10 * 1024 * 1024;
 
 class BadRequestError extends Error {
   statusCode = 400;
+}
+
+class PdfExtractionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PdfExtractionError";
+  }
 }
 
 type SummaryInput = {
@@ -32,16 +42,24 @@ function validateContentLength(content: string) {
   }
 }
 
-async function extractPdfText(file: File): Promise<string> {
-  const parser = new PDFParse({
-    data: Buffer.from(await file.arrayBuffer()),
-  });
-
+export async function extractPdfText(file: File): Promise<string> {
+  let parser: InstanceType<typeof PDFParse> | null = null;
   try {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    parser = new PDFParse({ data: buffer });
     const result = await parser.getText();
     return result.text.trim();
+  } catch (err) {
+    console.error("[summarize] PDF extraction failed:", err instanceof Error ? err.message : err);
+    throw new PdfExtractionError(
+      err instanceof Error ? err.message : "Falha ao processar o PDF"
+    );
   } finally {
-    await parser.destroy();
+    if (parser) {
+      await parser.destroy().catch((err: unknown) => {
+        console.warn("[summarize] Failed to destroy PDF parser:", err instanceof Error ? err.message : err);
+      });
+    }
   }
 }
 
@@ -62,7 +80,7 @@ function validatePdf(file: File) {
   }
 }
 
-async function parseSummaryInput(request: NextRequest): Promise<SummaryInput> {
+export async function parseSummaryInput(request: NextRequest): Promise<SummaryInput> {
   const contentType = request.headers.get("content-type") ?? "";
 
   if (contentType.includes("multipart/form-data")) {
@@ -77,7 +95,7 @@ async function parseSummaryInput(request: NextRequest): Promise<SummaryInput> {
       const extractedText = await extractPdfText(file);
 
       if (!extractedText) {
-        throw new BadRequestError("Não foi possível extrair texto deste PDF.");
+        throw new BadRequestError("Não foi possível extrair texto deste PDF. O arquivo pode estar protegido ou sem texto selecionável.");
       }
 
       validateContentLength(extractedText);
@@ -98,7 +116,13 @@ async function parseSummaryInput(request: NextRequest): Promise<SummaryInput> {
     return { content: manualContent, title: buildNoteTitle(manualContent) };
   }
 
-  const body = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    throw new BadRequestError("Payload inválido. Envie JSON com o campo 'content'.");
+  }
+
   const manualContent = normalizeManualContent((body as { content?: string })?.content);
 
   if (!manualContent) {
@@ -117,10 +141,13 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (!user) {
+      console.warn("[summarize] Unauthenticated request");
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
     const { content, title } = await parseSummaryInput(request);
+
+    console.info(`[summarize] Generating summary for user=${user.id} contentLength=${content.length}`);
 
     const summary = await generateStudySummary(content);
 
@@ -136,30 +163,39 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError) {
-      console.error("Error saving summary note:", insertError);
+      console.error("[summarize] Error saving note to study_notes:", insertError.message);
       return NextResponse.json(
         { error: "Resumo gerado, mas não foi possível salvar no histórico" },
         { status: 500 }
       );
     }
 
+    console.info(`[summarize] Summary saved note=${note.id} user=${user.id}`);
     return NextResponse.json({ summary, note, saved: true });
   } catch (error) {
     if (error instanceof BadRequestError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
 
+    if (error instanceof PdfExtractionError) {
+      return NextResponse.json(
+        { error: `Erro ao processar o PDF: ${error.message}` },
+        { status: 422 }
+      );
+    }
+
     if (
       error instanceof Error &&
       error.message.includes("GOOGLE_AI_STUDIO_API_KEY environment variable is not set")
     ) {
+      console.error("[summarize] Missing GOOGLE_AI_STUDIO_API_KEY");
       return NextResponse.json(
         { error: "Configuração da IA ausente no servidor. Tente novamente mais tarde." },
         { status: 503 }
       );
     }
 
-    console.error("Error generating summary:", error);
+    console.error("[summarize] Unexpected error:", error instanceof Error ? error.message : error);
     return NextResponse.json(
       { error: "Erro interno ao gerar resumo" },
       { status: 500 }
