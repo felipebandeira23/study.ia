@@ -25,6 +25,11 @@ type SummaryInput = {
   title: string;
 };
 
+type PdfParser = {
+  getText: () => Promise<{ text: string }>;
+  destroy: () => Promise<void>;
+};
+
 function normalizeManualContent(content: unknown): string {
   if (typeof content !== "string") {
     return "";
@@ -42,7 +47,7 @@ function validateContentLength(content: string) {
 }
 
 export async function extractPdfText(file: File): Promise<string> {
-  let parser: { getText: () => Promise<{ text: string }>; destroy: () => Promise<void> } | null = null;
+  let parser: PdfParser | null = null;
   try {
     const { PDFParse } = await import("pdf-parse");
     const buffer = Buffer.from(await file.arrayBuffer());
