@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PDFParse } from "pdf-parse";
 import { createClient } from "@/lib/supabase/server";
 import { generateStudySummary } from "@/lib/ai/gemini";
 import { buildNoteTitle, buildPdfNoteTitle } from "@/lib/utils";
@@ -43,6 +42,22 @@ function validateContentLength(content: string) {
 }
 
 export async function extractPdfText(file: File): Promise<string> {
+  // Dynamic import isolates pdf-parse (and its native deps) from the text-only
+  // code path. If the library fails to load in a given environment, only PDF
+  // requests are affected; text-only requests continue to work normally.
+  let PDFParse: (typeof import("pdf-parse"))["PDFParse"];
+  try {
+    ({ PDFParse } = await import("pdf-parse"));
+  } catch (importErr) {
+    console.error(
+      "[summarize] Failed to load pdf-parse module:",
+      importErr instanceof Error ? importErr.message : importErr
+    );
+    throw new PdfExtractionError(
+      "O módulo de leitura de PDF não está disponível neste ambiente. Tente colar o texto manualmente."
+    );
+  }
+
   let parser: InstanceType<typeof PDFParse> | null = null;
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -151,6 +166,8 @@ export async function POST(request: NextRequest) {
 
     const summary = await generateStudySummary(content);
 
+    console.info(`[summarize] Summary generated successfully, attempting to save for user=${user.id}`);
+
     const { data: note, error: insertError } = await supabase
       .from("study_notes")
       .insert({
@@ -163,11 +180,11 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError) {
-      console.error("[summarize] Error saving note to study_notes:", insertError.message);
-      return NextResponse.json(
-        { error: "Resumo gerado, mas não foi possível salvar no histórico" },
-        { status: 500 }
-      );
+      // The summary was generated successfully — don't block the user.
+      // Return it with saved: false so the UI can show it while also
+      // making clear it wasn't persisted.
+      console.error("[summarize] Error saving note to study_notes:", insertError.message, "code:", insertError.code);
+      return NextResponse.json({ summary, saved: false }, { status: 200 });
     }
 
     console.info(`[summarize] Summary saved note=${note.id} user=${user.id}`);
@@ -196,6 +213,9 @@ export async function POST(request: NextRequest) {
     }
 
     console.error("[summarize] Unexpected error:", error instanceof Error ? error.message : error);
+    if (error instanceof Error && error.stack) {
+      console.error("[summarize] Stack:", error.stack);
+    }
     return NextResponse.json(
       { error: "Erro interno ao gerar resumo" },
       { status: 500 }

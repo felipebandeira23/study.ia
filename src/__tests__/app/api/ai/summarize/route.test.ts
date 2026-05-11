@@ -40,7 +40,6 @@ jest.mock("pdf-parse", () => ({
     destroy: mockPdfDestroy,
   })),
 }));
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -262,18 +261,19 @@ describe("POST /api/ai/summarize — AI failure", () => {
 // ---------------------------------------------------------------------------
 
 describe("POST /api/ai/summarize — persistence failure", () => {
-  it("returns 500 with helpful message when DB insert fails", async () => {
+  it("returns 200 with summary and saved:false when DB insert fails", async () => {
     mockInsert.mockResolvedValue({
       data: null,
-      error: { message: "unique constraint violated" },
+      error: { message: "unique constraint violated", code: "23505" },
     });
 
     const req = makeJsonRequest({ content: "Conteúdo" });
     const res = await POST(req);
 
-    expect(res.status).toBe(500);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toMatch(/histórico/i);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { summary: string; saved: boolean };
+    expect(body.summary).toBe("Resumo gerado pela IA");
+    expect(body.saved).toBe(false);
   });
 });
 
