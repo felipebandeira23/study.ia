@@ -50,7 +50,7 @@ export default async function SavedPlansPage() {
 
   const { data: plans } = await supabase
     .from("study_plans")
-    .select("id, topic, level, duration_days, created_at")
+    .select("id, topic, level, duration_days, created_at, contest_name")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
@@ -99,6 +99,11 @@ export default async function SavedPlansPage() {
                     <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                       {plan.level} • {plan.duration_days} dias
                     </p>
+                    {plan.contest_name && (
+                      <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                        Concurso: {plan.contest_name}
+                      </p>
+                    )}
                     <p className="mt-1 text-xs text-zinc-400">
                       {new Date(plan.created_at).toLocaleString("pt-BR")}
                     </p>
@@ -110,6 +115,12 @@ export default async function SavedPlansPage() {
                       className="rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
                     >
                       Abrir
+                    </Link>
+                    <Link
+                      href={`/study/plans/${plan.id}/edit`}
+                      className="rounded-full border border-blue-300 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                    >
+                      Editar
                     </Link>
                     <form action={deletePlanAction}>
                       <input type="hidden" name="planId" value={plan.id} />

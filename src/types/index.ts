@@ -47,7 +47,27 @@ export interface StudyPlan {
   duration_days: number;
   level: StudyLevel;
   plan_content: string;
+  contest_name?: string | null;
+  contest_organizer?: string | null;
+  contest_exam_date?: string | null;
+  contest_edital_text?: string | null;
+  contest_notes?: string | null;
+  previous_exams_notes?: string | null;
   created_at: string;
+  updated_at?: string;
+}
+
+export interface TrackedContest {
+  id: string;
+  user_id: string;
+  name: string;
+  organizer?: string | null;
+  exam_date?: string | null;
+  edital_text?: string | null;
+  notes?: string | null;
+  previous_exams_notes?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface UserProfile {
