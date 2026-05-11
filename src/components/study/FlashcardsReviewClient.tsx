@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 type ReviewFlashcard = {
   id: string;
@@ -10,14 +10,12 @@ type ReviewFlashcard = {
 };
 
 type FlashcardsReviewClientProps = {
-  deckId: string;
   deckTitle: string;
   sessionId: string;
   flashcards: ReviewFlashcard[];
 };
 
 export default function FlashcardsReviewClient({
-  deckId,
   deckTitle,
   sessionId,
   flashcards,
@@ -25,9 +23,10 @@ export default function FlashcardsReviewClient({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [answers, setAnswers] = useState<Record<number, boolean>>({});
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [progressError, setProgressError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [finished, setFinished] = useState(false);
+  const savingRef = useRef(false);
 
   const totalCards = flashcards.length;
   const currentCard = flashcards[currentIndex];
@@ -43,8 +42,9 @@ export default function FlashcardsReviewClient({
     nextCorrectCount: number,
     shouldFinish: boolean
   ) {
+    savingRef.current = true;
     setSaving(true);
-    setSaveError(null);
+    setProgressError(null);
 
     try {
       const res = await fetch("/api/study-sessions", {
@@ -60,20 +60,26 @@ export default function FlashcardsReviewClient({
 
       if (!res.ok) {
         const data = await res.json();
-        setSaveError(data.error ?? "Não foi possível salvar seu progresso.");
+        setProgressError(data.error ?? "Não foi possível salvar seu progresso.");
       }
     } catch {
-      setSaveError("Erro de rede ao salvar progresso.");
+      setProgressError("Erro de rede ao salvar progresso.");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
 
   async function handleMarkAnswer(correct: boolean) {
+    if (savingRef.current) {
+      return;
+    }
+
     const nextAnswers = { ...answers, [currentIndex]: correct };
     const nextReviewedCount = Object.keys(nextAnswers).length;
     const nextCorrectCount = Object.values(nextAnswers).filter(Boolean).length;
-    const shouldFinish = !finished && nextReviewedCount === totalCards;
+    const isAllReviewed = nextReviewedCount === totalCards;
+    const shouldFinish = isAllReviewed && !finished;
 
     setAnswers(nextAnswers);
     setShowAnswer(false);
@@ -98,12 +104,6 @@ export default function FlashcardsReviewClient({
           </h1>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{deckTitle}</p>
         </div>
-        <Link
-          href={`/study/review/${deckId}`}
-          className="rounded-full border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-        >
-          Reiniciar
-        </Link>
       </div>
 
       <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
@@ -145,6 +145,7 @@ export default function FlashcardsReviewClient({
               <button
                 type="button"
                 onClick={() => handleMarkAnswer(true)}
+                disabled={saving}
                 className="rounded-full border border-emerald-300 px-5 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
               >
                 Acertei
@@ -152,6 +153,7 @@ export default function FlashcardsReviewClient({
               <button
                 type="button"
                 onClick={() => handleMarkAnswer(false)}
+                disabled={saving}
                 className="rounded-full border border-amber-300 px-5 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/30"
               >
                 Errei
@@ -189,14 +191,30 @@ export default function FlashcardsReviewClient({
 
       {finished && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-400">
-          ✅ Revisão concluída! Você acertou {correctCount} de {totalCards} cards.
+          <p>
+            ✅ Revisão concluída! Você acertou {correctCount} de {totalCards} cards.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Link
+              href="/dashboard"
+              className="font-semibold text-emerald-700 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-300"
+            >
+              Ir para dashboard
+            </Link>
+            <Link
+              href="/study/flashcards"
+              className="font-semibold text-emerald-700 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-300"
+            >
+              Criar novo deck
+            </Link>
+          </div>
         </div>
       )}
 
       {saving && <p className="text-xs text-zinc-500 dark:text-zinc-400">Salvando progresso...</p>}
-      {saveError && (
+      {progressError && (
         <p className="text-xs text-red-600 dark:text-red-400">
-          {saveError} Tente continuar e recarregar ao final.
+          {progressError} Tente continuar e recarregar ao final.
         </p>
       )}
     </div>

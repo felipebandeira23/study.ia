@@ -8,6 +8,10 @@ type UpdateStudySessionBody = {
   finished?: boolean;
 };
 
+function isValidNonNegativeNumber(value: unknown) {
+  return typeof value === "number" && !Number.isNaN(value) && value >= 0;
+}
+
 export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -26,24 +30,26 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "sessionId é obrigatório" }, { status: 400 });
     }
 
-    if (
-      typeof cardsReviewed !== "number" ||
-      Number.isNaN(cardsReviewed) ||
-      cardsReviewed < 0
-    ) {
+    if (!isValidNonNegativeNumber(cardsReviewed)) {
       return NextResponse.json(
         { error: "cardsReviewed deve ser um número válido" },
         { status: 400 }
       );
     }
 
-    if (
-      typeof correctAnswers !== "number" ||
-      Number.isNaN(correctAnswers) ||
-      correctAnswers < 0
-    ) {
+    if (!isValidNonNegativeNumber(correctAnswers)) {
       return NextResponse.json(
         { error: "correctAnswers deve ser um número válido" },
+        { status: 400 }
+      );
+    }
+
+    const reviewedValue = Number(cardsReviewed);
+    const correctValue = Number(correctAnswers);
+
+    if (correctValue > reviewedValue) {
+      return NextResponse.json(
+        { error: "correctAnswers não pode ser maior que cardsReviewed" },
         { status: 400 }
       );
     }
@@ -53,8 +59,8 @@ export async function PATCH(request: NextRequest) {
       correct_answers: number;
       finished_at?: string;
     } = {
-      cards_reviewed: cardsReviewed,
-      correct_answers: correctAnswers,
+      cards_reviewed: reviewedValue,
+      correct_answers: correctValue,
     };
 
     if (finished) {
@@ -65,12 +71,15 @@ export async function PATCH(request: NextRequest) {
       .from("study_sessions")
       .update(payload)
       .eq("id", sessionId)
+      .eq("user_id", user.id)
       .select("id, cards_reviewed, correct_answers, finished_at")
       .single();
 
     if (error || !session) {
+      const details =
+        process.env.NODE_ENV === "development" ? error?.message ?? null : null;
       return NextResponse.json(
-        { error: "Não foi possível atualizar a sessão de estudo" },
+        { error: "Não foi possível atualizar a sessão de estudo", details },
         { status: 500 }
       );
     }

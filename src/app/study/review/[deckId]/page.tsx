@@ -30,6 +30,7 @@ export default async function ReviewDeckPage({ params }: ReviewPageProps) {
     .from("decks")
     .select("id, title")
     .eq("id", deckId)
+    .eq("user_id", user.id)
     .maybeSingle();
 
   if (!deck) {
@@ -88,18 +89,36 @@ export default async function ReviewDeckPage({ params }: ReviewPageProps) {
     );
   }
 
-  const { data: studySession, error: studySessionError } = await supabase
+  const { data: activeSession } = await supabase
     .from("study_sessions")
-    .insert({
-      user_id: user.id,
-      deck_id: deck.id,
-      cards_reviewed: 0,
-      correct_answers: 0,
-    })
     .select("id")
-    .single();
+    .eq("user_id", user.id)
+    .eq("deck_id", deck.id)
+    .is("finished_at", null)
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  if (studySessionError || !studySession) {
+  let currentSession = activeSession;
+  let sessionError = null;
+
+  if (!currentSession) {
+    const sessionInsertResult = await supabase
+      .from("study_sessions")
+      .insert({
+        user_id: user.id,
+        deck_id: deck.id,
+        cards_reviewed: 0,
+        correct_answers: 0,
+      })
+      .select("id")
+      .single();
+
+    currentSession = sessionInsertResult.data;
+    sessionError = sessionInsertResult.error;
+  }
+
+  if (sessionError || !currentSession) {
     return (
       <div className="min-h-screen bg-zinc-50 px-4 py-12 dark:bg-zinc-950">
         <div className="mx-auto max-w-3xl rounded-2xl border border-red-200 bg-white p-6 dark:border-red-900 dark:bg-zinc-900">
@@ -124,9 +143,8 @@ export default async function ReviewDeckPage({ params }: ReviewPageProps) {
     <div className="min-h-screen bg-zinc-50 px-4 py-12 dark:bg-zinc-950">
       <div className="mx-auto max-w-3xl space-y-6">
         <FlashcardsReviewClient
-          deckId={deck.id}
           deckTitle={deck.title}
-          sessionId={studySession.id}
+          sessionId={currentSession.id}
           flashcards={flashcards}
         />
       </div>
