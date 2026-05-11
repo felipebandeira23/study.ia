@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateStudySummary } from "@/lib/ai/gemini";
-
-function buildNoteTitle(content: string) {
-  const normalized = content.replace(/\s+/g, " ").trim();
-  if (!normalized) return "Resumo de estudo";
-  return normalized.length > 80 ? `${normalized.slice(0, 77)}...` : normalized;
-}
+import { buildNoteTitle } from "@/lib/utils";
 
 export async function POST(request: NextRequest) {
   try {
