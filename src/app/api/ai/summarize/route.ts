@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
       // The summary was generated successfully — don't block the user.
       // Return it with saved: false so the UI can show it while also
       // making clear it wasn't persisted.
-      console.error("[summarize] Error saving note to study_notes:", insertError.message, "code:", insertError.code);
+      console.error("[summarize] Error saving note to study_notes:", insertError.message, "code:", insertError.code ?? "unknown");
       return NextResponse.json({ summary, saved: false }, { status: 200 });
     }
 
