@@ -3,7 +3,7 @@ import SummarizeClient from "@/components/study/SummarizeClient";
 
 export const metadata: Metadata = {
   title: "Gerar Resumo — StudyAI",
-  description: "Gere resumos de estudo inteligentes com IA",
+  description: "Gere resumos de estudo inteligentes com IA a partir de texto ou PDF",
 };
 
 export default function SummarizePage() {
@@ -15,7 +15,7 @@ export default function SummarizePage() {
             📝 Gerar Resumo
           </h1>
           <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-            Cole o conteúdo que deseja estudar e a IA criará um resumo
+            Cole o conteúdo ou envie um PDF para a IA criar um resumo
             organizado.
           </p>
         </div>

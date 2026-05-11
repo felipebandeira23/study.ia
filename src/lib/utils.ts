@@ -9,6 +9,20 @@ export function buildNoteTitle(content: string): string {
 }
 
 /**
+ * Builds a title for a PDF-based study note.
+ * Prioritizes the PDF file name and falls back to note-content title when needed.
+ */
+export function buildPdfNoteTitle(fileName: string, content: string): string {
+  const normalizedFileName = fileName.replace(/\s+/g, " ").trim();
+  const baseName = normalizedFileName.replace(/\s*\.pdf$/i, "").trim();
+  if (baseName) {
+    return baseName.length > 80 ? `${baseName.slice(0, 77)}...` : baseName;
+  }
+
+  return buildNoteTitle(content);
+}
+
+/**
  * Builds a title for a flashcard deck from its content.
  * Returns a prefixed, truncated version (max 60 chars) or a default title.
  */
