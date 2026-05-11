@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { StudyLevel } from "@/types";
 
@@ -141,9 +142,17 @@ export default function StudyPlanClient() {
             📅 Plano de estudo: {topic}
           </h2>
           {savedPlan && (
-            <p className="text-xs text-emerald-700 dark:text-emerald-400">
-              ✅ Plano salvo no histórico para: {savedPlan.topic}
-            </p>
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <p className="text-emerald-700 dark:text-emerald-400">
+                ✅ Plano salvo no histórico para: {savedPlan.topic}
+              </p>
+              <Link
+                href={`/study/plans/${savedPlan.id}`}
+                className="font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+              >
+                Abrir plano salvo →
+              </Link>
+            </div>
           )}
           <div className="prose prose-zinc dark:prose-invert max-w-none text-sm whitespace-pre-wrap">
             {plan}
