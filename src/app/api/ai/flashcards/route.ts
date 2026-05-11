@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateFlashcards } from "@/lib/ai/gemini";
-
-function buildDeckTitle(content: string) {
-  const normalized = content.replace(/\s+/g, " ").trim();
-  if (!normalized) return "Deck de estudos";
-  const trimmed = normalized.length > 60 ? `${normalized.slice(0, 57)}...` : normalized;
-  return `Deck: ${trimmed}`;
-}
+import { buildDeckTitle, clampCardCount } from "@/lib/utils";
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,7 +31,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const cardCount = Math.min(Math.max(count ?? 10, 1), 50);
+    const cardCount = clampCardCount(count);
     const flashcards = await generateFlashcards(content, cardCount);
 
     const { data: deck, error: deckError } = await supabase

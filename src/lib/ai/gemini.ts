@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { stripMarkdownCodeBlock } from "@/lib/utils";
 
 export const DEFAULT_MODEL = "gemini-2.0-flash";
 
@@ -86,8 +87,7 @@ Não inclua nenhum texto adicional, apenas o JSON.`;
   );
 
   try {
-    // Strip possible markdown code blocks
-    const cleaned = text.replace(/```(?:json)?\n?/g, "").trim();
+    const cleaned = stripMarkdownCodeBlock(text);
     return JSON.parse(cleaned) as Array<{ front: string; back: string }>;
   } catch {
     throw new Error("Failed to parse flashcards response as JSON");

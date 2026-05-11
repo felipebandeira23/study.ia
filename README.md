@@ -140,6 +140,12 @@ npm run format:check
 
 # Aplicar formatação (Prettier)
 npm run format
+
+# Rodar testes unitários (sem dependências externas)
+npm test
+
+# Rodar testes no modo CI (sem interactive watch)
+npm run test:ci
 ```
 
 ---
@@ -332,17 +338,17 @@ O `.gitignore` já está configurado para **nunca commitar** arquivos de variáv
 - **TODO:** Decidir se o conteúdo de IA será cacheado no banco para reduzir chamadas repetidas
 - **TODO:** Avaliar se deve haver plano gratuito vs pago (integração Stripe)
 - **TODO:** Definir política de retenção de dados (LGPD)
-- **TODO:** Adicionar testes automatizados (Jest + Testing Library)
-- **TODO:** Configurar CI/CD completo com GitHub Actions
+- ~~**TODO:** Adicionar testes automatizados (Jest + Testing Library)~~ ✅ Concluído
+- ~~**TODO:** Configurar CI/CD completo com GitHub Actions~~ ✅ Concluído
 
 ---
 
 ## Contribuindo
 
 1. Crie uma branch a partir de `main`: `git checkout -b feat/nome-da-feature`
-2. Faça suas alterações e certifique-se de que o lint e build passam:
+2. Faça suas alterações e certifique-se de que o lint, build e testes passam:
    ```bash
-   npm run lint && npm run build
+   npm run lint && npm run build && npm test
    ```
 3. Abra um Pull Request com descrição clara das mudanças.
 
