@@ -51,6 +51,7 @@ export default async function SavedPlansPage() {
   const { data: plans } = await supabase
     .from("study_plans")
     .select("id, topic, level, duration_days, created_at")
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
   return (

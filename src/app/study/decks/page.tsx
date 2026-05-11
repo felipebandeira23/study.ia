@@ -47,6 +47,7 @@ export default async function SavedDecksPage() {
   const { data: decks } = await supabase
     .from("decks")
     .select("id, title, created_at")
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
   return (

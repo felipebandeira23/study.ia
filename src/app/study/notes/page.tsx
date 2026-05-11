@@ -47,6 +47,7 @@ export default async function SavedNotesPage() {
   const { data: notes } = await supabase
     .from("study_notes")
     .select("id, title, summary, created_at")
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
   return (
