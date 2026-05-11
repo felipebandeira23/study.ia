@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 export default function SummarizeClient() {
@@ -82,9 +83,17 @@ export default function SummarizeClient() {
             📋 Resumo gerado
           </h2>
           {savedNote && (
-            <p className="text-xs text-emerald-700 dark:text-emerald-400">
-              ✅ Salvo no histórico como: {savedNote.title}
-            </p>
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <p className="text-emerald-700 dark:text-emerald-400">
+                ✅ Salvo no histórico como: {savedNote.title}
+              </p>
+              <Link
+                href={`/study/notes/${savedNote.id}`}
+                className="font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+              >
+                Abrir resumo salvo →
+              </Link>
+            </div>
           )}
           <div className="prose prose-zinc dark:prose-invert max-w-none text-sm whitespace-pre-wrap">
             {summary}

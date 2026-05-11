@@ -123,6 +123,12 @@ export default function FlashcardsClient() {
               >
                 Revisar agora →
               </Link>
+              <Link
+                href={`/study/decks/${deck.id}`}
+                className="font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+              >
+                Gerenciar deck →
+              </Link>
             </div>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

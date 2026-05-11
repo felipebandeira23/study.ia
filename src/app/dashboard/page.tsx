@@ -72,21 +72,21 @@ export default async function DashboardPage() {
       type: "Resumo" as const,
       title: note.title,
       created_at: note.created_at,
-      href: "/study/summarize",
+      href: `/study/notes/${note.id}`,
     })),
     ...(decksRecentResult.data ?? []).map((deck) => ({
       id: deck.id,
       type: "Deck" as const,
       title: deck.title,
       created_at: deck.created_at,
-      href: `/study/review/${deck.id}`,
+      href: `/study/decks/${deck.id}`,
     })),
     ...(plansRecentResult.data ?? []).map((plan) => ({
       id: plan.id,
       type: "Plano" as const,
       title: plan.topic,
       created_at: plan.created_at,
-      href: "/study/plan",
+      href: `/study/plans/${plan.id}`,
     })),
   ]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -189,6 +189,32 @@ export default async function DashboardPage() {
                 </p>
               </div>
             ))}
+          </div>
+
+          <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6">
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+              Gerenciar conteúdo salvo
+            </h2>
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Link
+                href="/study/notes"
+                className="rounded-xl border border-zinc-200 dark:border-zinc-700 px-4 py-3 text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:border-blue-300 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                Ver resumos salvos
+              </Link>
+              <Link
+                href="/study/decks"
+                className="rounded-xl border border-zinc-200 dark:border-zinc-700 px-4 py-3 text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:border-blue-300 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                Ver decks salvos
+              </Link>
+              <Link
+                href="/study/plans"
+                className="rounded-xl border border-zinc-200 dark:border-zinc-700 px-4 py-3 text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:border-blue-300 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                Ver planos salvos
+              </Link>
+            </div>
           </div>
 
           <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6">
