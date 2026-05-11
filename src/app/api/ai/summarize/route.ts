@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateStudySummary } from "@/lib/ai/gemini";
 
+function buildNoteTitle(content: string) {
+  const normalized = content.replace(/\s+/g, " ").trim();
+  if (!normalized) return "Resumo de estudo";
+  return normalized.length > 80 ? `${normalized.slice(0, 77)}...` : normalized;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -32,7 +38,27 @@ export async function POST(request: NextRequest) {
 
     const summary = await generateStudySummary(content);
 
-    return NextResponse.json({ summary });
+    const title = buildNoteTitle(content);
+    const { data: note, error: insertError } = await supabase
+      .from("study_notes")
+      .insert({
+        user_id: user.id,
+        title,
+        content,
+        summary,
+      })
+      .select("id, title")
+      .single();
+
+    if (insertError) {
+      console.error("Error saving summary note:", insertError);
+      return NextResponse.json(
+        { error: "Resumo gerado, mas não foi possível salvar no histórico" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ summary, note, saved: true });
   } catch (error) {
     console.error("Error generating summary:", error);
     return NextResponse.json(
