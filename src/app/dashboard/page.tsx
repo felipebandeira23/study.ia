@@ -29,6 +29,12 @@ type TrackedContest = {
   created_at: string;
 };
 
+type DashboardPageProps = {
+  searchParams?: Promise<{
+    contestSearch?: string;
+  }>;
+};
+
 async function addTrackedContestAction(formData: FormData) {
   "use server";
 
@@ -84,7 +90,11 @@ async function removeTrackedContestAction(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const contestSearchRaw = resolvedSearchParams?.contestSearch;
+  const contestSearch = typeof contestSearchRaw === "string" ? contestSearchRaw.trim() : "";
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -140,20 +150,19 @@ export default async function DashboardPage() {
   const trackedContests = (trackedContestsResult.data ?? []) as TrackedContest[];
   let contestFeed: Awaited<ReturnType<typeof getContestNewsFeed>> = [];
 
-  if (trackedContests.length > 0) {
-    try {
-      contestFeed = await getContestNewsFeed(
-        trackedContests.map((contest) => ({
-          name: contest.name,
-          organizer: contest.organizer,
-          examDate: contest.exam_date,
-          notes: contest.notes,
-        })),
-        6
-      );
-    } catch (error) {
-      console.error("Error generating contest news feed:", error);
-    }
+  try {
+    contestFeed = await getContestNewsFeed(
+      trackedContests.map((contest) => ({
+        name: contest.name,
+        organizer: contest.organizer,
+        examDate: contest.exam_date,
+        notes: contest.notes,
+      })),
+      6,
+      contestSearch
+    );
+  } catch (error) {
+    console.error("Error loading contest news feed:", error);
   }
 
   const recentActivity: RecentActivity[] = [
@@ -403,16 +412,40 @@ export default async function DashboardPage() {
 
             <section className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
               <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-                📰 Feed de concursos (curadoria IA)
+                📰 Feed de notícias de concursos
               </h2>
-              <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
-                Conteúdo assistido por IA a partir dos concursos rastreados e contexto informado por
-                você. Sempre confirme em editais e fontes oficiais.
+              <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                Notícias reais consultadas em RSS estruturado de fontes confiáveis. Use a pesquisa
+                para rastrear atualizações de um concurso específico.
               </p>
+
+              <form className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <input
+                  type="search"
+                  name="contestSearch"
+                  defaultValue={contestSearch}
+                  placeholder="Pesquisar concurso (ex: INSS, TJSP, Polícia Federal)"
+                  className="block w-full rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                />
+                <button
+                  type="submit"
+                  className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                >
+                  Pesquisar
+                </button>
+                {contestSearch ? (
+                  <Link
+                    href="/dashboard"
+                    className="rounded-full border border-zinc-300 px-4 py-2 text-center text-sm font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  >
+                    Limpar
+                  </Link>
+                ) : null}
+              </form>
 
               {contestFeed.length === 0 ? (
                 <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
-                  Adicione concursos para gerar um feed contextualizado.
+                  Nenhuma notícia encontrada para os filtros atuais.
                 </p>
               ) : (
                 <ul className="mt-4 space-y-3">
@@ -425,14 +458,30 @@ export default async function DashboardPage() {
                         {item.title}
                       </p>
                       <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                        {item.contestName || "Concurso geral"}
+                        Concurso relacionado: {item.contestName || "Não identificado"}
                       </p>
                       <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">{item.summary}</p>
                       <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                        Relevância: {item.relevance}
+                        Fonte: {item.source}
                       </p>
-                      <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-300">
-                        {item.sourceLabel}
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-1 inline-block text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                      >
+                        Abrir notícia →
+                      </a>
+                      <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+                        Publicação:{" "}
+                        {item.publishedAt
+                          ? new Date(item.publishedAt).toLocaleString("pt-BR")
+                          : "Não informada"}
+                      </p>
+                      <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+                        {item.aiAssisted
+                          ? "Resumo/relevância organizados com apoio de IA."
+                          : "Resumo exibido diretamente da fonte (sem IA)."}
                       </p>
                     </li>
                   ))}
