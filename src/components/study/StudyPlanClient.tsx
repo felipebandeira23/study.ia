@@ -8,6 +8,7 @@ export default function StudyPlanClient() {
   const [durationDays, setDurationDays] = useState(30);
   const [level, setLevel] = useState<StudyLevel>("iniciante");
   const [plan, setPlan] = useState<string | null>(null);
+  const [savedPlan, setSavedPlan] = useState<{ id: string; topic: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,6 +17,7 @@ export default function StudyPlanClient() {
     setLoading(true);
     setError(null);
     setPlan(null);
+    setSavedPlan(null);
 
     try {
       const res = await fetch("/api/ai/generate", {
@@ -32,6 +34,7 @@ export default function StudyPlanClient() {
       }
 
       setPlan(data.plan);
+      setSavedPlan(data.studyPlan ?? null);
     } catch {
       setError("Erro de rede. Tente novamente.");
     } finally {
@@ -137,6 +140,11 @@ export default function StudyPlanClient() {
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
             📅 Plano de estudo: {topic}
           </h2>
+          {savedPlan && (
+            <p className="text-xs text-emerald-700 dark:text-emerald-400">
+              ✅ Plano salvo no histórico para: {savedPlan.topic}
+            </p>
+          )}
           <div className="prose prose-zinc dark:prose-invert max-w-none text-sm whitespace-pre-wrap">
             {plan}
           </div>

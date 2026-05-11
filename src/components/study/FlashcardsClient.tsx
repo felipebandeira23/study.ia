@@ -7,6 +7,7 @@ export default function FlashcardsClient() {
   const [content, setContent] = useState("");
   const [count, setCount] = useState(10);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
+  const [deck, setDeck] = useState<{ id: string; title: string } | null>(null);
   const [flipped, setFlipped] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -17,6 +18,7 @@ export default function FlashcardsClient() {
     setError(null);
     setFlashcards([]);
     setFlipped({});
+    setDeck(null);
 
     try {
       const res = await fetch("/api/ai/flashcards", {
@@ -33,6 +35,7 @@ export default function FlashcardsClient() {
       }
 
       setFlashcards(data.flashcards);
+      setDeck(data.deck ?? null);
     } catch {
       setError("Erro de rede. Tente novamente.");
     } finally {
@@ -108,6 +111,11 @@ export default function FlashcardsClient() {
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
             🗂️ {flashcards.length} flashcards gerados — clique para virar
           </h2>
+          {deck && (
+            <p className="text-xs text-emerald-700 dark:text-emerald-400">
+              ✅ Deck salvo no histórico: {deck.title}
+            </p>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {flashcards.map((card, i) => (
               <button

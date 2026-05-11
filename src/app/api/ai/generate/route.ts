@@ -40,7 +40,27 @@ export async function POST(request: NextRequest) {
 
     const plan = await generateStudyPlan(topic, days, studyLevel);
 
-    return NextResponse.json({ plan });
+    const { data: studyPlan, error: insertError } = await supabase
+      .from("study_plans")
+      .insert({
+        user_id: user.id,
+        topic: topic.trim(),
+        duration_days: days,
+        level: studyLevel,
+        plan_content: plan,
+      })
+      .select("id, topic")
+      .single();
+
+    if (insertError) {
+      console.error("Error saving study plan:", insertError);
+      return NextResponse.json(
+        { error: "Plano gerado, mas não foi possível salvar no histórico" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ plan, studyPlan, saved: true });
   } catch (error) {
     console.error("Error generating study plan:", error);
     return NextResponse.json(

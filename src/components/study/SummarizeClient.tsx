@@ -5,6 +5,7 @@ import { useState } from "react";
 export default function SummarizeClient() {
   const [content, setContent] = useState("");
   const [summary, setSummary] = useState<string | null>(null);
+  const [savedNote, setSavedNote] = useState<{ id: string; title: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -13,6 +14,7 @@ export default function SummarizeClient() {
     setLoading(true);
     setError(null);
     setSummary(null);
+    setSavedNote(null);
 
     try {
       const res = await fetch("/api/ai/summarize", {
@@ -29,6 +31,7 @@ export default function SummarizeClient() {
       }
 
       setSummary(data.summary);
+      setSavedNote(data.note ?? null);
     } catch {
       setError("Erro de rede. Tente novamente.");
     } finally {
@@ -78,6 +81,11 @@ export default function SummarizeClient() {
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
             📋 Resumo gerado
           </h2>
+          {savedNote && (
+            <p className="text-xs text-emerald-700 dark:text-emerald-400">
+              ✅ Salvo no histórico como: {savedNote.title}
+            </p>
+          )}
           <div className="prose prose-zinc dark:prose-invert max-w-none text-sm whitespace-pre-wrap">
             {summary}
           </div>
